@@ -1,0 +1,64 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-android-arm64:
+    name: Build Android ARM64
+    runs-on: ubuntu-latest
+    environment: android-build
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Setup Android NDK
+      uses: android-actions/setup-android-ndk@v1
+      with:
+        ndk-version: '25.1.8937393'  # 推荐使用与您开发环境匹配的NDK版本
+        cache: true
+
+    - name: Install CMake
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake
+
+    - name: Verify tools
+      run: |
+        echo "NDK Path: $ANDROID_NDK_HOME"
+        cmake --version
+        ninja --version || echo "Ninja not installed"
+
+    - name: Configure with CMake
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+          -DANDROID_ABI=arm64-v8a \
+          -DANDROID_PLATFORM=android-24 \
+          -DANDROID_STL=c++_static \
+          -G Ninja
+
+    - name: Build project
+      run: |
+        cmake --build build --target MobileGL -j $(nproc)
+
+    - name: List artifacts
+      run: |
+        find build -name '*.so' -ls
+
+    - name: Upload shared library
+      uses: actions/upload-artifact@v3
+      with:
+        name: mobilegl-lib
+        path: build/libMobileGL.so
